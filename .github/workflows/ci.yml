@@ -76,7 +76,7 @@ jobs:
             expected-slug: plugin
             expected-count: 3
             not-expected-strings: "Vendor string"
-            exclude: vendor
+            exclude: vendor/*
 
           - name: plugin-include
             fixture: plugin
@@ -84,12 +84,14 @@ jobs:
             expected-count: 1
             expected-strings: "Help text"
             not-expected-strings: "Hello World|Admin text|Vendor string"
+            domain: test-plugin
             include: "includes/*"
 
           - name: plugin-source-subdir
             fixture: plugin
             slug: plugin
             source: includes
+            domain: test-plugin
             expected-slug: plugin
             expected-count: 1
             expected-strings: "Help text"
@@ -98,7 +100,7 @@ jobs:
           - name: theme-default
             fixture: theme
             expected-slug: theme
-            expected-count: 1
+            expected-count: 2
             expected-strings: "Theme content"
 
     steps:
