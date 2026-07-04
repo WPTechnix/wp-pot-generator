@@ -1,0 +1,184 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate action.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate action metadata
+        uses: cardinalby/schema-validator-action@v3
+        with:
+          file: action.yml
+          schema: https://json.schemastore.org/github-action.json
+
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        env:
+          SHELLCHECK_OPTS: -e SC1091
+
+  actionlint:
+    name: Actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint workflow files
+        uses: raven-actions/actionlint@v2
+
+  test:
+    name: ${{ matrix.name }}
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: plugin-default
+            fixture: plugin
+            expected-slug: plugin
+            expected-count: 4
+            expected-strings: "Hello World"
+
+          - name: plugin-custom
+            fixture: plugin
+            expected-slug: custom-slug
+            expected-count: 4
+            expected-strings: "Hello World"
+            slug: custom-slug
+            domain: test-plugin
+            package-name: "My Plugin"
+            headers: '{"Report-Msgid-Bugs-To":"https://example.com"}'
+
+          - name: plugin-ignore-domain
+            fixture: plugin
+            expected-slug: plugin
+            expected-count: 5
+            expected-strings: "External dep"
+            ignore-domain: "true"
+
+          - name: plugin-exclude
+            fixture: plugin
+            expected-slug: plugin
+            expected-count: 3
+            not-expected-strings: "Vendor string"
+            exclude: vendor
+
+          - name: plugin-include
+            fixture: plugin
+            expected-slug: plugin
+            expected-count: 1
+            expected-strings: "Help text"
+            not-expected-strings: "Hello World|Admin text|Vendor string"
+            include: "includes/*"
+
+          - name: plugin-source-subdir
+            fixture: plugin
+            slug: plugin
+            source: includes
+            expected-slug: plugin
+            expected-count: 1
+            expected-strings: "Help text"
+            not-expected-strings: "Hello World"
+
+          - name: theme-default
+            fixture: theme
+            expected-slug: theme
+            expected-count: 1
+            expected-strings: "Theme content"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run WP Pot Generator
+        id: pot
+        uses: ./
+        with:
+          working-directory: fixtures/${{ matrix.fixture }}
+          source: ${{ matrix.source || '.' }}
+          output-file: ./languages/<slug>.pot
+          slug: ${{ matrix.slug || '' }}
+          domain: ${{ matrix.domain || '' }}
+          package-name: ${{ matrix.package-name || '' }}
+          headers: ${{ matrix.headers || '' }}
+          exclude: ${{ matrix.exclude || '' }}
+          include: ${{ matrix.include || '' }}
+          ignore-domain: ${{ matrix.ignore-domain || 'false' }}
+
+      - name: Verify outputs
+        working-directory: fixtures/${{ matrix.fixture }}
+        env:
+          POT_SLUG: ${{ steps.pot.outputs.slug }}
+          POT_COUNT: ${{ steps.pot.outputs.string-count }}
+          POT_PATH: ${{ steps.pot.outputs.output-path }}
+          POT_DIR: ${{ steps.pot.outputs.output-directory }}
+        run: |
+          info()  { echo "::notice::$*"; }
+          fail()  { echo "::error::$*"; exit 1; }
+
+          # --- Verify slug output ---
+          [ -n "$POT_SLUG" ] || fail "outputs.slug is empty"
+          [ "$POT_SLUG" = "${{ matrix.expected-slug }}" ] \
+            || fail "slug mismatch: got '$POT_SLUG', expected '${{ matrix.expected-slug }}'"
+          info "slug: $POT_SLUG"
+
+          # --- Verify string-count output ---
+          [ "$POT_COUNT" = "${{ matrix.expected-count }}" ] \
+            || fail "string-count mismatch: got '$POT_COUNT', expected '${{ matrix.expected-count }}'"
+          info "string-count: $POT_COUNT"
+
+          # --- Verify output-path / output-directory are non-empty ---
+          [ -n "$POT_PATH" ] || fail "outputs.output-path is empty"
+          [ -n "$POT_DIR" ]  || fail "outputs.output-directory is empty"
+
+          # --- Verify POT file exists on host (relative path) ---
+          FILE="languages/$POT_SLUG.pot"
+          [ -f "$FILE" ] || fail "POT file not found at $FILE"
+          info "POT file: $FILE"
+
+          # --- Verify output-directory matches ---
+          DIR="languages"
+          [ -d "$DIR" ] || fail "Output directory not found at $DIR"
+          info "Output directory: $DIR"
+
+          # --- Verify expected strings are present ---
+          if [ -n "${{ matrix.expected-strings }}" ]; then
+            IFS='|' read -ra EXPS <<< "${{ matrix.expected-strings }}"
+            for exp in "${EXPS[@]}"; do
+              grep -q "msgid \"$exp\"" "$FILE" \
+                || fail "Missing expected string: '$exp'"
+            done
+          fi
+
+          # --- Verify NOT-expected strings are absent ---
+          if [ -n "${{ matrix.not-expected-strings }}" ]; then
+            IFS='|' read -ra NOTS <<< "${{ matrix.not-expected-strings }}"
+            for not in "${NOTS[@]}"; do
+              ! grep -q "msgid \"$not\"" "$FILE" \
+                || fail "Unexpected string found: '$not'"
+            done
+          fi
+
+          # --- Scenario-specific POT header checks ---
+          if [ "${{ matrix.name }}" = "plugin-custom" ]; then
+            grep -q "Project-Id-Version: My Plugin" "$FILE" \
+              || fail "Missing Project-Id-Version header in POT"
+            grep -q "Report-Msgid-Bugs-To: https://example.com" "$FILE" \
+              || fail "Missing Report-Msgid-Bugs-To header in POT"
+          fi
+
+          info "All checks passed for ${{ matrix.name }}"

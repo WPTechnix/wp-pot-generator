@@ -1,0 +1,82 @@
+name: "WP POT Generator"
+description: "Run WP-CLI's wp i18n make-pot to generate .pot translation files for WordPress plugins and themes."
+author: "WPTechnix"
+branding:
+  icon: "globe"
+  color: "blue"
+
+inputs:
+  working-directory:
+    description: "Working directory relative to GITHUB_WORKSPACE (or absolute path)"
+    required: false
+    default: "."
+
+  source:
+    description: "Directory to scan for translatable strings (relative to working-directory or absolute)"
+    required: false
+    default: "."
+
+  output-file:
+    description: "Path for the generated .pot file (relative to working-directory or absolute). Use <slug> as a placeholder for the plugin slug."
+    required: false
+    default: "./languages/<slug>.pot"
+
+  slug:
+    description: "Plugin or theme slug. Auto-detected from directory basename if not provided."
+    required: false
+    default: ""
+
+  domain:
+    description: "Text domain to look for in source code. Auto-detected from plugin header if not provided."
+    required: false
+    default: ""
+
+  package-name:
+    description: "Package name for the POT file headers."
+    required: false
+    default: ""
+
+  headers:
+    description: "Additional POT headers as a JSON string (e.g. '{\"Report-Msgid-Bugs-To\":\"https://example.com\"}')"
+    required: false
+    default: ""
+
+  exclude:
+    description: "Comma-separated list of file patterns or directories to exclude"
+    required: false
+    default: ""
+
+  include:
+    description: "Comma-separated list of file patterns to include"
+    required: false
+    default: ""
+
+  ignore-domain:
+    description: "Extract strings with any text domain instead of filtering by domain"
+    required: false
+    default: "false"
+
+outputs:
+  output-path:
+    description: "Absolute path to the generated .pot file"
+  output-directory:
+    description: "Absolute path to the directory containing the .pot file"
+  string-count:
+    description: "Number of translatable strings found (excluding the header entry)"
+  slug:
+    description: "Plugin or theme slug that was used"
+
+runs:
+  using: "docker"
+  image: "Dockerfile"
+  args:
+    - ${{ inputs.working-directory }}
+    - ${{ inputs.source }}
+    - ${{ inputs.output-file }}
+    - ${{ inputs.slug }}
+    - ${{ inputs.domain }}
+    - ${{ inputs.package-name }}
+    - ${{ inputs.headers }}
+    - ${{ inputs.exclude }}
+    - ${{ inputs.include }}
+    - ${{ inputs.ignore-domain }}
