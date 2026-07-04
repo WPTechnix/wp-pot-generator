@@ -75,15 +75,15 @@ jobs:
             fixture: plugin
             expected-slug: plugin
             expected-count: 3
-            not-expected-strings: "Vendor string"
-            exclude: vendor/*
+            not-expected-strings: "Help text"
+            exclude: includes/*
 
           - name: plugin-include
             fixture: plugin
             expected-slug: plugin
-            expected-count: 1
-            expected-strings: "Help text"
-            not-expected-strings: "Hello World|Admin text|Vendor string"
+            expected-count: 2
+            expected-strings: "Help text|Test Plugin"
+            not-expected-strings: "Hello World|Admin text|Vendor string|External dep"
             domain: test-plugin
             include: "includes/*"
 
