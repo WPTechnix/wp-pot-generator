@@ -5,6 +5,10 @@ updates:
     schedule:
       interval: 'weekly'
       day: 'monday'
+      time: '07:00'
+    labels:
+      - 'dependencies'
+      - 'ci'
     commit-message:
       prefix: 'chore'
       include: 'scope'
@@ -14,6 +18,9 @@ updates:
     schedule:
       interval: 'weekly'
       day: 'monday'
+      time: '07:00'
+    labels:
+      - 'dependencies'
     commit-message:
       prefix: 'chore'
       include: 'scope'
